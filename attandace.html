@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus Biometric Portal & Academic Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+    <style>
+        /* ==========================================
+           1. ACADEMIC LIGHT DESIGN SYSTEM
+           ========================================== */
+        :root {
+            --primary-school-blue: #1E3A8A;
+            --primary-accent: #2563EB;
+            --primary-accent-hover: #1D4ED8;
+            --success-color: #10B981;
+            --danger-color: #EF4444;
+            --warning-color: #F59E0B;
+            --font-main: 'Inter', system-ui, -apple-system, sans-serif;
+            
+            --bg-canvas: #F1F5F9;
+            --surface-card: #FFFFFF;
+            --text-primary: #1E293B;
+            --text-secondary: #64748B;
+            --border-muted: #E2E8F0;
+            
+            --sidebar-width: 280px;
+            --transition-speed: 0.25s;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-canvas);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            overflow-x: hidden;
+        }
+
+        .dashboard-shell {
+            display: grid;
+            grid-template-columns: var(--sidebar-width) 1fr;
+            width: 100vw;
+            min-height: 100vh;
+        }
+
+        /* School Portal Sidebar Frame */
+        aside.sidebar {
+            background-color: var(--primary-school-blue);
+            color: #FFFFFF;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 2rem 1.25rem;
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.05);
+        }
+
+        .brand-header { margin-bottom: 2rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem; }
+        .brand-logo {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .brand-logo span { color: #60A5FA; }
+
+        .role-switcher-container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.3rem;
+            border-radius: 10px;
+            display: flex;
+            position: relative;
+            margin-bottom: 1.75rem;
+        }
+
+        .role-toggle-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: rgba(255,255,255,0.7);
+            font-weight: 600;
+            font-size: 0.85rem;
+            padding: 0.5rem 0;
+            cursor: pointer;
+            z-index: 2;
+            transition: color var(--transition-speed);
+        }
+
+        .role-toggle-btn.active { color: var(--primary-school-blue); }
+        .role-slider {
+            position: absolute;
+            top: 0.3rem; left: 0.3rem;
+            width: calc(50% - 0.3rem); height: calc(100% - 0.6rem);
+            background: #FFFFFF; border-radius: 7px; z-index: 1;
+            transition: transform 0.2s ease;
+        }
+
+        body[data-role="Teachers"] .role-slider { transform: translateX(100%); }
+        body[data-role="Teachers"] .role-toggle-btn#btn-teachers { color: var(--primary-school-blue); }
+        body[data-role="Teachers"] .role-toggle-btn#btn-students { color: rgba(255,255,255,0.7); }
+
+        .nav-menu { list-style: none; display: flex; flex-direction: column; gap: 0.35rem; flex-grow: 1; }
+        .nav-item button {
+            width: 100%; background: transparent; border: none;
+            color: rgba(255, 255, 255, 0.75); font-size: 0.9rem; font-weight: 500;
+            padding: 0.75rem 1rem; border-radius: 8px; cursor: pointer;
+            text-align: left; display: flex; align-items: center; gap: 0.75rem;
+            transition: all var(--transition-speed);
+        }
+        .nav-item button:hover { background-color: rgba(255, 255, 255, 0.08); color: #FFFFFF; }
+        .nav-item.active button { background-color: var(--primary-accent); color: #FFFFFF; font-weight: 600; }
+
+        .widget-footer { background: rgba(0, 0, 0, 0.15); padding: 0.85rem; border-radius: 10px; text-align: center; }
+        .clock-time { font-size: 1.25rem; font-weight: 700; font-family: monospace; color: #FFFFFF; }
+        .clock-date { font-size: 0.7rem; color: #93C5FD; margin-top: 0.2rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        /* Workspace Core Layout */
+        main.workspace-content {
+            padding: 2.5rem; display: flex; flex-direction: column; gap: 1.75rem;
+            overflow-y: auto; max-height: 100vh;
+        }
+
+        .view-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-muted); padding-bottom: 1.25rem; }
+        .view-title h1 { font-size: 1.6rem; font-weight: 700; color: var(--primary-school-blue); }
+        .view-title p { font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem; }
+
+        .btn-utility {
+            background-color: var(--surface-card); color: var(--text-primary); border: 1px solid var(--border-muted);
+            padding: 0.55rem 1.1rem; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;
+            display: inline-flex; align-items: center; gap: 0.5rem; transition: all var(--transition-speed);
+        }
+        .btn-utility:hover { background-color: #F8FAFC; border-color: var(--text-secondary); }
+        .btn-utility-primary { background-color: var(--primary-accent); color: #FFFFFF; border: none; }
+        .btn-utility-primary:hover { background-color: var(--primary-accent-hover); }
+        .btn-utility:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .kpi-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; }
+        .kpi-card { background-color: var(--surface-card); border: 1px solid var(--border-muted); padding: 1.25rem; border-radius: 12px; display: flex; flex-direction: column; gap: 0.35rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .kpi-label { font-size: 0.75rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+        .kpi-value { font-size: 1.85rem; font-weight: 700; color: var(--primary-school-blue); }
+
+        /* Dynamic View Container Layouts */
+        .dashboard-view { display: none; animation: slideUp 0.3s ease forwards; }
+        .dashboard-view.active-view { display: flex; flex-direction: column; gap: 1.75rem; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+        .table-responsive-container { width: 100%; overflow-x: auto; border-radius: 12px; border: 1px solid var(--border-muted); background-color: var(--surface-card); box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        table.data-grid { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
+        table.data-grid th { padding: 0.85rem 1.25rem; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.03em; background-color: #F8FAFC; color: var(--text-secondary); border-bottom: 1px solid var(--border-muted); }
+        table.data-grid td { padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--border-muted); color: var(--text-primary); }
+        table.data-grid tr:last-child td { border-bottom: none; }
+
+        .primary-key-badge { font-family: monospace; font-size: 0.85rem; font-weight: 700; color: var(--primary-accent); cursor: pointer; padding: 0.2rem 0.4rem; border-radius: 6px; background-color: rgba(37, 99, 235, 0.08); display: inline-block; }
+        .pct-container { display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 700; }
+        .pct-trigger { display: inline-flex; justify-content: center; align-items: center; width: 20px; height: 20px; border-radius: 50%; background-color: rgba(16, 185, 129, 0.1); color: var(--success-color); font-size: 0.75rem; cursor: pointer; }
+
+        /* Hardware Kiosk Scan Interface Grid */
+        .camera-grid-layout { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 1.75rem; width: 100%; }
+        .video-feed-card { background-color: var(--surface-card); border: 1px solid var(--border-muted); border-radius: 14px; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .video-viewport-wrapper { position: relative; width: 100%; aspect-ratio: 16 / 9; background-color: #0F172A; border-radius: 10px; overflow: hidden; }
+        video.live-stream-node { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        
+        /* Institutional Safe HUD Graphics */
+        .biometric-hud-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; justify-content: center; align-items: center; }
+        .scanning-target-box { width: 220px; height: 220px; border: 2px dashed rgba(255, 255, 255, 0.4); border-radius: 20px; position: relative; box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.5); }
+        .scanning-target-box::before, .scanning-target-box::after { content: ''; position: absolute; width: 16px; height: 16px; border: 4px solid #60A5FA; }
+        .scanning-target-box::before { top: -2px; left: -2px; border-right: 0; border-bottom: 0; }
+        .scanning-target-box::after { bottom: -2px; right: -2px; border-left: 0; border-top: 0; }
+        .laser-sweep-line { position: absolute; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, #60A5FA, transparent); top: 0; animation: laserScan 2.2s linear infinite; display: none; }
+        
+        .video-viewport-wrapper.is-scanning .laser-sweep-line { display: block; }
+        .video-viewport-wrapper.is-scanning .scanning-target-box { border-color: var(--warning-color); }
+        .video-viewport-wrapper.is-success .scanning-target-box { border-color: var(--success-color); background-color: rgba(16, 185, 129, 0.08); }
+
+        .console-log-card { background-color: #1E293B; border-radius: 14px; padding: 1.25rem; font-family: monospace; display: flex; flex-direction: column; gap: 1rem; color: #E2E8F0; }
+        .console-header { font-size: 0.75rem; text-transform: uppercase; color: #94A3B8; letter-spacing: 0.05em; border-bottom: 1px solid #334155; padding-bottom: 0.5rem; }
+        .console-output-stream { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.85rem; max-height: 260px; }
+        .console-row-stamp { color: #64748B; margin-right: 0.5rem; }
+
+        /* Enrollment Terminal Panels Layout */
+        .enrollment-form-panel { background-color: var(--surface-card); border: 1px solid var(--border-muted); padding: 1.5rem; border-radius: 14px; display: flex; flex-direction: column; gap: 1.1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .form-input-group { display: flex; flex-direction: column; gap: 0.4rem; }
+        .form-input-group label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); }
+        .form-input-group input, .form-input-group select { background-color: #F8FAFC; border: 1px solid var(--border-muted); color: var(--text-primary); padding: 0.65rem 0.9rem; border-radius: 8px; font-size: 0.9rem; outline: none; }
+        .form-input-group input:focus, .form-input-group select:focus { border-color: var(--primary-accent); background-color: #FFFFFF; }
+
+        /* Notification Banner Interface Configuration */
+        .system-status-banner { background-color: #FEF3C7; border: 1px solid #F59E0B; padding: 0.85rem 1.25rem; border-radius: 10px; color: #B45309; font-size: 0.85rem; font-weight: 500; display: flex; align-items: center; gap: 0.5rem; }
+        .system-status-banner.ready { background-color: #D1FAE5; border-color: var(--success-color); color: #065F46; }
+
+        /* Overlay Framework Layout Modals */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(15, 23, 42, 0.4); backdrop-filter: blur(3px); z-index: 1000; opacity: 0; visibility: hidden; transition: opacity 0.2s; }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .biodata-drawer { position: fixed; top: 0; right: -440px; width: 400px; height: 100vh; background-color: var(--surface-card); border-left: 1px solid var(--border-muted); box-shadow: -5px 0 25px rgba(0,0,0,0.05); z-index: 1001; padding: 2rem 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .biodata-drawer.open { right: 0; }
+        .drawer-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-muted); padding-bottom: 0.75rem; }
+        .btn-close-drawer { background: transparent; border: none; color: var(--text-secondary); font-size: 1.35rem; cursor: pointer; }
+        .profile-avatar-block { display: flex; align-items: center; gap: 1rem; background: #F8FAFC; padding: 1rem; border-radius: 10px; }
+        .avatar-placeholder { width: 52px; height: 52px; border-radius: 50%; background-color: var(--primary-accent); display: flex; justify-content: center; align-items: center; font-size: 1.35rem; font-weight: 700; color: white; }
+        .bio-data-grid { display: flex; flex-direction: column; gap: 0.85rem; }
+        .bio-data-row { display: flex; justify-content: space-between; padding: 0.6rem 0; border-bottom: 1px solid var(--border-muted); font-size: 0.85rem; }
+        .bio-data-label { color: var(--text-secondary); }
+        .bio-data-value { font-weight: 600; }
+
+        .drilldown-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.95); width: 440px; background-color: var(--surface-card); border: 1px solid var(--border-muted); border-radius: 14px; box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1); z-index: 1002; padding: 1.75rem; display: flex; flex-direction: column; gap: 1.25rem; opacity: 0; visibility: hidden; transition: all 0.2s; }
+        .drilldown-modal.open { transform: translate(-50%, -50%) scale(1); opacity: 1; visibility: visible; }
+        .chart-wrapper { position: relative; width: 100%; height: 200px; }
+    </style>
+</head>
+<body data-role="Students">
+
+    <div class="dashboard-shell">
+        <aside class="sidebar">
+            <div class="sidebar-top-group">
+                <div class="brand-header">
+                    <div class="brand-logo"><span>🏫</span> Campus Terminal</div>
+                </div>
+
+                <div class="role-switcher-container">
+                    <div class="role-slider" id="role-slider-element"></div>
+                    <button class="role-toggle-btn active" id="btn-students" onclick="switchGlobalRole('Students')">Student Roster</button>
+                    <button class="role-toggle-btn" id="btn-teachers" onclick="switchGlobalRole('Teachers')">Faculty</button>
+                </div>
+
+                <ul class="nav-menu">
+                    <li class="nav-item active" id="nav-report" onclick="switchView('report')">
+                        <button>📋 Master Sheets</button>
+                    </li>
+                    <li class="nav-item" id="nav-face-scan" onclick="switchView('face-scan')">
+                        <button>📸 Kiosk Scan-In</button>
+                    </li>
+                    <li class="nav-item" id="nav-late-entry" onclick="switchView('late-entry')">
+                        <button>⏳ Late Registers</button>
+                    </li>
+                    <li class="nav-item" id="nav-absentees" onclick="switchView('absentees')">
+                        <button>❌ Absence Records</button>
+                    </li>
+                    <li class="nav-item" id="nav-admin" onclick="switchView('admin')">
+                        <button>⚙️ Admin Terminal</button>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="widget-footer">
+                <div class="clock-time" id="live-clock-time">00:00:00 AM</div>
+                <div class="clock-date" id="live-clock-date">LOADING PORTAL TIME...</div>
+            </div>
+        </aside>
+
+        <main class="workspace-content" id="main-workspace" data-active-view="report">
+            
+            <div class="system-status-banner" id="neural-weights-banner">
+                🔄 Accessing school biometric recognition matrices... Please hold.
+            </div>
+
+            <div class="view-header">
+                <div class="view-title">
+                    <h1 id="dynamic-view-title">Master Sheets</h1>
+                    <p id="dynamic-view-description">Viewing verified structural records ledger arrays inside school files.</p>
+                </div>
+                <div class="action-utilities">
+                    <button class="btn-utility btn-utility-primary" onclick="window.print()">🖨️ Print Document</button>
+                </div>
+            </div>
+
+            <div class="kpi-container" id="kpi-summary-grid"></div>
+
+            <div id="view-report" class="dashboard-view active-view">
+                <div class="table-responsive-container">
+                    <table class="data-grid">
+                        <thead><tr id="report-table-headers"></tr></thead>
+                        <tbody id="report-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="view-face-scan" class="dashboard-view">
+                <div class="camera-grid-layout">
+                    <div class="video-feed-card">
+                        <div class="video-viewport-wrapper" id="scan-hud-wrapper">
+                            <video id="webcam-scan-node" class="live-stream-node" autoplay playsinline muted></video>
+                            <div class="biometric-hud-overlay">
+                                <div class="scanning-target-box"><div class="laser-sweep-line"></div></div>
+                            </div>
+                        </div>
+                        <div class="camera-controls-row" style="display:flex; gap:1rem;">
+                            <button class="btn-utility btn-utility-primary" id="btn-start-scan-cam" onclick="toggleHardwareCamera('webcam-scan-node', true)">Power Video</button>
+                            <button class="btn-utility" style="background-color: var(--danger-color); border:none; color:white;" onclick="toggleHardwareCamera('webcam-scan-node', false)">Disconnect</button>
+                            <button class="btn-utility btn-utility-primary" style="background-color: var(--success-color); margin-left:auto;" id="btn-trigger-matching" onclick="executeBiometricFaceScan()" disabled>Verify Identity</button>
+                        </div>
+                    </div>
+                    <div class="console-log-card">
+                        <div class="console-header">Kiosk Processing Log Stream</div>
+                        <div class="console-output-stream" id="scan-console-stream">
+                            <div><span class="console-row-stamp">[00:00:00]</span> Biometric pipeline standing by. Register files in Admin Terminal to run test actions.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-late-entry" class="dashboard-view">
+                <div class="table-responsive-container">
+                    <table class="data-grid">
+                        <thead><tr id="late-table-headers"></tr></thead>
+                        <tbody id="late-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="view-absentees" class="dashboard-view">
+                <div class="table-responsive-container">
+                    <table class="data-grid">
+                        <thead><tr id="absentee-table-headers"></tr></thead>
+                        <tbody id="absentee-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="view-admin" class="dashboard-view">
+                <div class="camera-grid-layout">
+                    <div class="enrollment-form-panel">
+                        <h3 style="font-weight: 700; color: var(--primary-school-blue); border-bottom: 2px solid var(--border-muted); padding-bottom: 0.4rem;">Student/Faculty Profile Entry</h3>
+                        
+                        <div class="form-input-group">
+                            <label>Designated Track Group</label>
+                            <select id="form-entity-role">
+                                <option value="Student">Student Roster Assignment</option>
+                                <option value="Teacher">Faculty Assignment</option>
+                            </select>
+                        </div>
+                        <div class="form-input-group">
+                            <label>Roll Number / Employee ID</label>
+                            <input type="text" id="form-entity-id" placeholder="e.g., ROLL-24, FAC-10" required />
+                        </div>
+                        <div class="form-input-group">
+                            <label>Full Name</label>
+                            <input type="text" id="form-entity-name" placeholder="Enter full name" required />
+                        </div>
+                        <div class="form-input-group" id="student-meta-fields">
+                            <label>Classroom Track / Section</label>
+                            <input type="text" id="form-student-class" placeholder="e.g., 12-A, 11-B" />
+                        </div>
+                        
+                        <button class="btn-utility btn-utility-primary" id="btn-save-enrollment" onclick="processBiometricRegistration()" style="justify-content: center; padding: 0.75rem; margin-top: 0.5rem;" disabled>
+                            💾 Commit Biometric File
+                        </button>
+                    </div>
+
+                    <div class="video-feed-card">
+                        <div class="video-viewport-wrapper" id="enroll-hud-wrapper">
+                            <video id="webcam-enroll-node" class="live-stream-node" autoplay playsinline muted></video>
+                        </div>
+                        <div class="camera-controls-row" style="display:flex; gap:1rem;">
+                            <button class="btn-utility" onclick="toggleHardwareCamera('webcam-enroll-node', true)">Initialize Feed</button>
+                            <button class="btn-utility btn-utility-primary" id="btn-capture-vector" onclick="captureBiometricVector()" disabled>Extract Geometries</button>
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); font-family: monospace;" id="enroll-vector-status">
+                            Status: Vector matrix unassigned.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <div class="modal-overlay" id="global-screen-overlay" onclick="closeAllActiveOverlays()"></div>
+    <div class="biodata-drawer" id="profile-biodata-drawer">
+        <div class="drawer-header"><h2>Profile Factfile Matrix</h2><button class="btn-close-drawer" onclick="closeAllActiveOverlays()">&times;</button></div>
+        <div class="profile-avatar-block"><div class="avatar-placeholder" id="drawer-avatar-symbol">?</div><div><h3 id="drawer-profile-name">Loading...</h3><p id="drawer-profile-role">Registry Profile Matrix</p></div></div>
+        <div class="bio-data-grid" id="drawer-fields-container"></div>
+    </div>
+    <div class="drilldown-modal" id="metrics-drilldown-modal">
+        <div class="drawer-header"><h2 id="modal-drilldown-title">Proportional Balance Ratio</h2><button class="btn-close-drawer" onclick="closeAllActiveOverlays()">&times;</button></div>
+        <div class="chart-wrapper"><canvas id="drilldownChartCanvas"></canvas></div>
+        <div class="bio-data-grid" id="modal-metrics-summary-container"></div>
+    </div>
+
+    <script>
+        // Roster memory configurations 
+        const registeredStudentRoster = [];
+        const registeredTeacherRoster = [];
+
+        let applicationStateActiveRole = "Students";
+        let applicationStateActiveView = "report";
+        let contextualGlobalChartInstance = null;
+        
+        let activeHardwareVideoStreamTrack = null;
+        let loadedNeuralModelWeightsStatus = false;
+        let temporarilyCompiledFaceDescriptor = null;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            initializeChronometerPipeline();
+            loadNeuralBiometricWeights();
+            loadFromLocalStorage(); // Pull persistent files from browser container storage
+            renderActiveApplicationWorkspace();
+
+            document.getElementById("form-entity-role").addEventListener("change", (e) => {
+                const metaBlock = document.getElementById("student-meta-fields");
+                metaBlock.style.display = (e.target.value === "Student") ? "flex" : "none";
+            });
+        });
+
+        /* ==========================================
+           LOCAL STORAGE PERSISTENCE ENGINE (CLEAN MATRIX MAPS)
+           ========================================== */
+        function saveToLocalStorage() {
+            // Flatten structural Float32Arrays directly into standard clean array sets
+            const processedStudents = registeredStudentRoster.map(s => ({
+                ...s,
+                biometricVector: Array.from(s.biometricVector)
+            }));
+            const processedTeachers = registeredTeacherRoster.map(t => ({
+                ...t,
+                biometricVector: Array.from(t.biometricVector)
+            }));
+            
+            localStorage.setItem('campus_stored_students', JSON.stringify(processedStudents));
+            localStorage.setItem('campus_stored_teachers', JSON.stringify(processedTeachers));
+        }
+
+        function loadFromLocalStorage() {
+            const rawStudents = localStorage.getItem('campus_stored_students');
+            const rawTeachers = localStorage.getItem('campus_stored_teachers');
+
+            if (rawStudents) {
+                const parsed = JSON.parse(rawStudents);
+                registeredStudentRoster.length = 0;
+                parsed.forEach(s => {
+                    registeredStudentRoster.push({
+                        ...s,
+                        biometricVector: new Float32Array(s.biometricVector) // Build back computational array object structure
+                    });
+                });
+            }
+
+            if (rawTeachers) {
+                const parsed = JSON.parse(rawTeachers);
+                registeredTeacherRoster.length = 0;
+                parsed.forEach(t => {
+                    registeredTeacherRoster.push({
+                        ...t,
+                        biometricVector: new Float32Array(t.biometricVector) // Build back computational array object structure
+                    });
+                });
+            }
+        }
+
+        function initializeChronometerPipeline() {
+            const timeNode = document.getElementById("live-clock-time");
+            const dateNode = document.getElementById("live-clock-date");
+            function pulse() {
+                const d = new Date();
+                timeNode.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                dateNode.textContent = d.toLocaleDateString([], { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+            }
+            pulse(); setInterval(pulse, 1000);
+        }
+
+        async function loadNeuralBiometricWeights() {
+            const weightsURL = "https://vladmandic.github.io/face-api/model/";
+            try {
+                await faceapi.nets.ssdMobilenetv1.loadFromUri(weightsURL);
+                await faceapi.nets.faceLandmark68Net.loadFromUri(weightsURL);
+                await faceapi.nets.faceRecognitionNet.loadFromUri(weightsURL);
+                
+                loadedNeuralModelWeightsStatus = true;
+                const banner = document.getElementById("neural-weights-banner");
+                banner.className = "system-status-banner ready";
+                banner.textContent = "✦ Biometric weights compiled cleanly. Scanner terminal functions are fully operational.";
+                
+                document.getElementById("btn-capture-vector").disabled = false;
+                document.getElementById("btn-trigger-matching").disabled = false;
+            } catch (err) {
+                document.getElementById("neural-weights-banner").textContent = `✕ Weight configuration mapping error asset: ${err.message}`;
+            }
+        }
+
+        async function toggleHardwareCamera(targetVideoNodeID, activateStateFlag) {
+            const videoElement = document.getElementById(targetVideoNodeID);
+            if (!activateStateFlag) {
+                if (activeHardwareVideoStreamTrack) {
+                    activeHardwareVideoStreamTrack.getTracks().forEach(track => track.stop());
+                    activeHardwareVideoStreamTrack = null;
+                }
+                videoElement.srcObject = null;
+                return;
+            }
+
+            if (activeHardwareVideoStreamTrack) {
+                activeHardwareVideoStreamTrack.getTracks().forEach(track => track.stop());
+            }
+
+            try {
+                const streamInstance = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 1280, height: 720, facingMode: "user" },
+                    audio: false
+                });
+                activeHardwareVideoStreamTrack = streamInstance;
+                videoElement.srcObject = streamInstance;
+            } catch (err) {
+                alert(`Hardware framework capture failure parameters: ${err.message}`);
+            }
+        }
+
+        async function captureBiometricVector() {
+            const videoNode = document.getElementById("webcam-enroll-node");
+            const statusLabel = document.getElementById("enroll-vector-status");
+            
+            if (!videoNode.srcObject) {
+                statusLabel.textContent = "Status: Operational Exception - Camera must be powered first.";
+                return;
+            }
+
+            statusLabel.textContent = "Status: Running vector landmark spatial transforms...";
+            const extractionResult = await faceapi.detectSingleFace(videoNode).withFaceLandmarks().withFaceDescriptor();
+
+            if (!extractionResult) {
+                statusLabel.textContent = "Status: Processing Error - Target pattern profiles unaligned. Retrying context alignment.";
+                return;
+            }
+
+            temporarilyCompiledFaceDescriptor = extractionResult.descriptor;
+            statusLabel.textContent = "Status: Signature compiled verified (128 positions logged). Ready to save.";
+            document.getElementById("btn-save-enrollment").disabled = false;
+        }
+
+        function processBiometricRegistration() {
+            const role = document.getElementById("form-entity-role").value;
+            const uniqueID = document.getElementById("form-entity-id").value.trim();
+            const legalName = document.getElementById("form-entity-name").value.trim();
+            const classTrack = document.getElementById("form-student-class").value.trim();
+
+            if (!uniqueID || !legalName || !temporarilyCompiledFaceDescriptor) {
+                alert("Validation Exception: Missing validation criteria maps.");
+                return;
+            }
+
+            if (role === "Student") {
+                registeredStudentRoster.push({
+                    rollNo: uniqueID, name: legalName, class: classTrack || "General", section: "A",
+                    role: "Student", attendancePct: 0.0, presentDays: 0, absentDays: 0, lateEntries: 0,
+                    biometricVector: temporarilyCompiledFaceDescriptor,
+                    lastAttendanceDate: null  
+                });
+            } else {
+                registeredTeacherRoster.push({
+                    idNo: uniqueID, name: legalName, department: classTrack || "Academic Branch", subject: "General Assignment",
+                    role: "Teacher", attendancePct: 0.0, presentDays: 0, absentDays: 0, lateEntries: 0,
+                    biometricVector: temporarilyCompiledFaceDescriptor,
+                    lastAttendanceDate: null  
+                });
+            }
+
+            saveToLocalStorage(); // Sync right into localStorage container
+            alert(`Profile verified & committed cleanly: ${legalName} (${uniqueID})`);
+            
+            document.getElementById("form-entity-id").value = "";
+            document.getElementById("form-entity-name").value = "";
+            temporarilyCompiledFaceDescriptor = null;
+            document.getElementById("btn-save-enrollment").disabled = true;
+            document.getElementById("enroll-vector-status").textContent = "Status: Idle. Clean mapping execution path confirmed.";
+            
+            toggleHardwareCamera('webcam-enroll-node', false);
+            renderActiveApplicationWorkspace();
+        }
+
+        /* ==========================================
+           3. 24-HOUR / SAME-DAY DOUBLE CHECK PREVENTER
+           ========================================== */
+        async function executeBiometricFaceScan() {
+            const videoNode = document.getElementById("webcam-scan-node");
+            const hud = document.getElementById("scan-hud-wrapper");
+            
+            if (!videoNode.srcObject) {
+                writeLog("Processing Blocked: Hardware channel stream context unassigned.", true);
+                return;
+            }
+
+            hud.className = "video-viewport-wrapper is-scanning";
+            writeLog("Reading matrix parameters against live terminal interface frame...");
+
+            const targetedRoster = (applicationStateActiveRole === "Students") ? registeredStudentRoster : registeredTeacherRoster;
+
+            if (targetedRoster.length === 0) {
+                writeLog("Verification Blocked: Targeted array parameters list contains zero entries.", true);
+                hud.className = "video-viewport-wrapper";
+                return;
+            }
+
+            const activeDetection = await faceapi.detectSingleFace(videoNode).withFaceLandmarks().withFaceDescriptor();
+
+            if (!activeDetection) {
+                writeLog("Transform Exception: Facial structure alignment matrices trace failure.", true);
+                hud.className = "video-viewport-wrapper";
+                return;
+            }
+
+            let primeMatchMatchObject = null;
+            let minimalCalculatedDistanceThreshold = 0.55; 
+
+            targetedRoster.forEach(entity => {
+                const mathematicalDistance = faceapi.euclideanDistance(activeDetection.descriptor, entity.biometricVector);
+                if (mathematicalDistance < minimalCalculatedDistanceThreshold) {
+                    minimalCalculatedDistanceThreshold = mathematicalDistance;
+                    primeMatchMatchObject = entity;
+                }
+            });
+
+            if (primeMatchMatchObject) {
+                const systemCurrentDateString = new Date().toLocaleDateString(); // Capture current calendar date key string
+
+                // Calendar check lock barrier (Ensures strict 24-hour limit block per student/faculty per day)
+                if (primeMatchMatchObject.lastAttendanceDate === systemCurrentDateString) {
+                    hud.className = "video-viewport-wrapper is-success";
+                    writeLog(`[LOCKOUT ENGAGED] ${primeMatchMatchObject.name} has already logged check-in parameters today (${systemCurrentDateString}). Request rejected.`);
+                    setTimeout(() => { hud.className = "video-viewport-wrapper"; }, 2500);
+                    return;
+                }
+
+                primeMatchMatchObject.lastAttendanceDate = systemCurrentDateString;
+                primeMatchMatchObject.presentDays += 1;
+                
+                const netCombinedDays = primeMatchMatchObject.presentDays + primeMatchMatchObject.absentDays;
+                primeMatchMatchObject.attendancePct = parseFloat(((primeMatchMatchObject.presentDays / (netCombinedDays || 1)) * 100).toFixed(1));
+
+                saveToLocalStorage(); // Immediately commit calculations into storage
+                hud.className = "video-viewport-wrapper is-success";
+                const matchingKey = primeMatchMatchObject.rollNo || primeMatchMatchObject.idNo;
+                writeLog(`✦ Verified Attendance Log Match -> Name: ${primeMatchMatchObject.name} (${matchingKey}). Registry updated.`);
+                
+                generateAnalyticsKpiCards(targetedRoster);
+                renderActiveApplicationWorkspace();
+                setTimeout(() => { hud.className = "video-viewport-wrapper"; }, 2500);
+            } else {
+                writeLog("Log Failure: Biometric facial features do not coordinate with active file directories.", true);
+                hud.className = "video-viewport-wrapper";
+            }
+        }
+
+        function writeLog(msg, errorState = false) {
+            const str = document.getElementById("scan-console-stream");
+            const stamp = new Date().toLocaleTimeString([], { hour12: false });
+            const row = document.createElement("div");
+            if (errorState) row.style.color = "var(--danger-color)";
+            row.innerHTML = `<span class="console-row-stamp">[${stamp}]</span> ${msg}`;
+            str.appendChild(row);
+            str.scrollTop = str.scrollHeight;
+        }
+
+        /* ==========================================
+           4. DYNAMIC SCREEN RENDERING SYSTEM MAPS
+           ========================================== */
+        function switchGlobalRole(targetRole) {
+            if (applicationStateActiveRole === targetRole) return;
+            applicationStateActiveRole = targetRole;
+            document.body.setAttribute("data-role", targetRole);
+            renderActiveApplicationWorkspace();
+        }
+
+        function switchView(targetView) {
+            applicationStateActiveView = targetView;
+            document.getElementById("main-workspace").setAttribute("data-active-view", targetView);
+            document.querySelectorAll(".nav-item").forEach(i => i.classList.remove("active"));
+            document.getElementById(`nav-${targetView}`).classList.add("active");
+            document.querySelectorAll(".dashboard-view").forEach(v => v.classList.remove("active-view"));
+            document.getElementById(`view-${targetView}`).classList.add("active-view");
+
+            if (targetView !== 'face-scan') toggleHardwareCamera('webcam-scan-node', false);
+            if (targetView !== 'admin') toggleHardwareCamera('webcam-enroll-node', false);
+
+            renderActiveApplicationWorkspace();
+        }
+
+        function renderActiveApplicationWorkspace() {
+            const contextDataset = (applicationStateActiveRole === "Students") ? registeredStudentRoster : registeredTeacherRoster;
+            
+            const title = document.getElementById("dynamic-view-title");
+            const desc = document.getElementById("dynamic-view-description");
+            if (applicationStateActiveView === "report") {
+                title.textContent = `${applicationStateActiveRole} Master Ledger Sheets`;
+                desc.textContent = "Displaying locked-in verification status configurations for registered users.";
+            } else if (applicationStateActiveView === "face-scan") {
+                title.textContent = "Biometric Check-In Kiosk Terminal";
+                desc.textContent = "Hardware verification portal mapping input vectors dynamically against local schemas.";
+            } else if (applicationStateActiveView === "admin") {
+                title.textContent = "Profile Enrollment Console";
+                desc.textContent = "Compile and index structural legal properties along with facial coordinate parameters.";
+            }
+
+            generateAnalyticsKpiCards(contextDataset);
+            buildMasterReportGrid(contextDataset);
+            buildLateEntryGrid(contextDataset);
+            buildAbsenteesGrid(contextDataset);
+        }
+
+        function generateAnalyticsKpiCards(dataset) {
+            const kpiGrid = document.getElementById("kpi-summary-grid");
+            const globalTotalCount = dataset.length;
+            const absoluteMean = globalTotalCount ? (dataset.reduce((acc, r) => acc + r.attendancePct, 0) / globalTotalCount).toFixed(1) : "0.0";
+            const lates = dataset.reduce((acc, r) => acc + r.lateEntries, 0);
+            const risk = dataset.filter(r => r.attendancePct < 75).length;
+
+            kpiGrid.innerHTML = `
+                <div class="kpi-card"><span class="kpi-label">Registered Files (${applicationStateActiveRole})</span><span class="kpi-value">${globalTotalCount}</span></div>
+                <div class="kpi-card"><span class="kpi-label">Attendance Ratio Target</span><span class="kpi-value" style="color: var(--success-color);">${absoluteMean}%</span></div>
+                <div class="kpi-card"><span class="kpi-label">Tardy / Late Markers</span><span class="kpi-value" style="color: var(--warning-color);">${lates}</span></div>
+                <div class="kpi-card"><span class="kpi-label">Low Engagement Warning (&lt;75%)</span><span class="kpi-value" style="color: var(--danger-color);">${risk}</span></div>
+            `;
+        }
+
+        function buildMasterReportGrid(dataset) {
+            const head = document.getElementById("report-table-headers");
+            const body = document.getElementById("report-table-body");
+            const pkLabel = (applicationStateActiveRole === "Students") ? "Roll No" : "Faculty ID";
+            const scopeLabel = (applicationStateActiveRole === "Students") ? "Classroom Block" : "Division Core";
+
+            head.innerHTML = `<th>${pkLabel}</th><th>Full Name</th><th>${scopeLabel}</th><th>Days Present</th><th>Days Absent</th><th>Late Count</th><th>Consistency Score</th>`;
+            
+            if(dataset.length === 0) {
+                body.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--text-secondary);">No active database mappings matching current filter fields. Input parameters inside Admin Terminal first.</td></tr>`;
+                return;
+            }
+
+            let html = "";
+            dataset.forEach(row => {
+                const key = row.rollNo || row.idNo;
+                const meta = row.class || row.department;
+                html += `
+                    <tr>
+                        <td><span class="primary-key-badge" onclick="activateDrawer('${key}')">${key}</span></td>
+                        <td style="font-weight:600; color:var(--primary-school-blue);">${row.name}</td>
+                        <td>${meta}</td>
+                        <td>${row.presentDays} Days</td>
+                        <td>${row.absentDays} Days</td>
+                        <td>${row.lateEntries}</td>
+                        <td><div class="pct-container"><span>${row.attendancePct}%</span><span class="pct-trigger" onclick="activateDrilldown('${key}')">%</span></div></td>
+                    </tr>
+                `;
+            });
+            body.innerHTML = html;
+        }
+
+        function buildLateEntryGrid(dataset) {
+            const head = document.getElementById("late-table-headers");
+            const body = document.getElementById("late-table-body");
+            head.innerHTML = `<th>Identification Key</th><th>Full Name</th><th>Role Class</th><th>Tardy Occurrences</th><th>Action Required</th>`;
+            
+            const lates = dataset.filter(r => r.lateEntries > 0);
+            if (lates.length === 0) {
+                body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:1.5rem; color:var(--text-secondary);">No tardy records found in current workspace state ledger.</td></tr>`;
+                return;
+            }
+            let html = "";
+            lates.forEach(row => {
+                const key = row.rollNo || row.idNo;
+                html += `<tr><td><span class="primary-key-badge">${key}</span></td><td>${row.name}</td><td>${row.role}</td><td>${row.lateEntries}</td><td><span style="color:var(--warning-color); font-weight:600;">Issue Tardy Slip</span></td></tr>`;
+            });
+            body.innerHTML = html;
+        }
+
+        function buildAbsenteesGrid(dataset) {
+            const head = document.getElementById("absentee-table-headers");
+            const body = document.getElementById("absentee-table-body");
+            head.innerHTML = `<th>Identification Key</th><th>Full Name</th><th>Absences Index</th><th>Rate Balance</th><th>Escalation Priority</th>`;
+            
+            const abs = dataset.filter(r => r.absentDays > 0);
+            if (abs.length === 0) {
+                body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:1.5rem; color:var(--text-secondary);">All system records present and accounted for. No absence records logged.</td></tr>`;
+                return;
+            }
+            let html = "";
+            abs.forEach(row => {
+                const key = row.rollNo || row.idNo;
+                html += `<tr><td><span class="primary-key-badge">${key}</span></td><td>${row.name}</td><td>${row.absentDays} Days</td><td>${row.attendancePct}%</td><td><span style="color:var(--danger-color); font-weight:600;">Parent Notification</span></td></tr>`;
+            });
+            body.innerHTML = html;
+        }
+
+        function closeAllActiveOverlays() {
+            document.getElementById("global-screen-overlay").classList.remove("active");
+            document.getElementById("profile-biodata-drawer").classList.remove("open");
+            document.getElementById("metrics-drilldown-modal").classList.remove("open");
+        }
+
+        function extractProfileRecord(idKey) {
+            return [...registeredStudentRoster, ...registeredTeacherRoster].find(r => (r.rollNo === idKey || r.idNo === idKey));
+        }
+
+        function activateDrawer(idKey) {
+            const p = extractProfileRecord(idKey); if (!p) return;
+            document.getElementById("drawer-profile-name").textContent = p.name;
+            document.getElementById("drawer-profile-role").textContent = `Verified ${p.role} File Asset`;
+            document.getElementById("drawer-avatar-symbol").textContent = p.name.charAt(0);
+
+            let html = `
+                <div class="bio-data-row"><span class="bio-data-label">Internal Registration Key</span><span class="bio-data-value">${idKey}</span></div>
+                <div class="bio-data-row"><span class="bio-data-label">Days Present Log</span><span class="bio-data-value" style="color:var(--success-color);">${p.presentDays}</span></div>
+                <div class="bio-data-row"><span class="bio-data-label">Days Absent Log</span><span class="bio-data-value" style="color:var(--danger-color);">${p.absentDays}</span></div>
+                <div class="bio-data-row"><span class="bio-data-label">Last Attendance Run</span><span class="bio-data-value">${p.lastAttendanceDate || "Never Scanned"}</span></div>
+                <div class="bio-data-row" style="border:none;"><span class="bio-data-label">Proportional Metric Average</span><span class="bio-data-value" style="font-size:1.1rem; color:var(--primary-accent);">${p.attendancePct}%</span></div>
+            `;
+            document.getElementById("drawer-fields-container").innerHTML = html;
+            document.getElementById("global-screen-overlay").classList.add("active");
+            document.getElementById("profile-biodata-drawer").classList.add("open");
+        }
+
+        function activateDrilldown(idKey) {
+            const p = extractProfileRecord(idKey); if (!p) return;
+            document.getElementById("modal-drilldown-title").textContent = `Ratio Verification: ${p.name}`;
+            
+            document.getElementById("modal-metrics-summary-container").innerHTML = `
+                <div class="bio-data-row"><span class="bio-data-label">Days Present Count</span><span class="bio-data-value">${p.presentDays}</span></div>
+                <div class="bio-data-row"><span class="bio-data-label">Days Absent Count</span><span class="bio-data-value">${p.absentDays}</span></div>
+            `;
+
+            document.getElementById("global-screen-overlay").classList.add("active");
+            document.getElementById("metrics-drilldown-modal").classList.add("open");
+
+            if (contextualGlobalChartInstance) contextualGlobalChartInstance.destroy();
+            contextualGlobalChartInstance = new Chart(document.getElementById("drilldownChartCanvas"), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Days Present', 'Days Absent'],
+                    datasets: [{ data: [p.presentDays, p.absentDays], backgroundColor: ['#10B981', '#EF4444'], borderWidth: 0 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#1E293B' } } }, cutout: '70%' }
+            });
+        }
+    </script>
+</body>
+</html>
